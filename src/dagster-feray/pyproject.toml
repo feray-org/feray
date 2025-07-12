@@ -1,27 +1,24 @@
 [project]
-name = "feray-workspace"
+name = "dagster-feray"
 version = "0.1.1"
-description = "Workspace root - not published"
+description = "dagster integration for feray"
 readme = "README.md"
 authors = [
     { name = "danielgafni", email = "danielgafni16@gmail.com" },
     { name = "geoheil", email = "georg.kf.heiler@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "feray",
+    "dagster>=1.11",
+]
 
-[tool.uv]
-package = false 
+[tool.uv.sources]
+feray = { workspace = true }    
 
-[tool.uv.workspace]
-members = ["src/*"]
+[tool.uv.build-backend]
+module-root = ""
 
 [build-system]
 requires = ["uv_build>=0.7.20,<0.8.0"]
 build-backend = "uv_build"
-
-[dependency-groups]
-dev = [
-    "pyrefly>=0.23.1",
-    "ruff>=0.12.3",
-]

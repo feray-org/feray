@@ -1,27 +1,28 @@
 [project]
-name = "feray-workspace"
+name = "feray"
 version = "0.1.1"
-description = "Workspace root - not published"
+description = "Memoization-enabled feature store on ray"
 readme = "README.md"
 authors = [
     { name = "danielgafni", email = "danielgafni16@gmail.com" },
     { name = "geoheil", email = "georg.kf.heiler@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "ibis>=3.3.0",
+    "polars>=1.31.0",
+    "polars-hash>=0.5.4",
+    "sqlmodel>=0.0.24",
+]
 
-[tool.uv]
-package = false 
+[project.optional-dependencies]
+ray = [
+    "ray>=2.47.1",
+]
 
-[tool.uv.workspace]
-members = ["src/*"]
+[tool.uv.build-backend]
+module-root = ""
 
 [build-system]
 requires = ["uv_build>=0.7.20,<0.8.0"]
 build-backend = "uv_build"
-
-[dependency-groups]
-dev = [
-    "pyrefly>=0.23.1",
-    "ruff>=0.12.3",
-]
