@@ -95,9 +95,6 @@ class MetadataStore(ABC, Generic[S]):
     @abstractmethod
     def all_provenance(self, *, asset_key: S) -> List[Provenance]: ...
     @abstractmethod
-    def update_provenance_status(self, *, asset_key: S, data_version: DataVersion, status: ValidationStatus) -> bool: ...
-    # --- NEW: Abstract methods for deletion and pruning ---
-    @abstractmethod
     def prune_provenance(self, *, asset_key: S, versions_to_delete: List[DataVersion]) -> None: ...
 
 # --------------------------------------------------------------------------
@@ -109,7 +106,6 @@ class FeatureRegistry(Generic[S]):
         self.definitions = {d.asset_key: d for d in definitions}
         self.dag = {d.asset_key: set(d.dependencies) for d in self.definitions.values()}
         self.reverse_dag = self._build_reverse_dag()
-        self.feature_to_asset_map = {feat: d.asset_key for d in self.definitions.values() for feat in d.output_features}
 
     def resolve_execution_order(self, target_asset_keys: List[S]) -> List[S]:
         order, visited = [], set()
@@ -138,7 +134,7 @@ class FeatureService(Generic[S]):
     def materialize(self, asset_keys: Optional[List[S]] = None, force_recompute: bool = False):
         target_assets = asset_keys or list(self.registry.definitions.keys())
         execution_order = self.registry.resolve_execution_order(target_assets)
-        self.logger(f"\n--- Starting Standalone Batch Materialization (Force={force_recompute}) ---")
+        self.logger(f"\n--- Starting Batch Materialization (Force={force_recompute}) ---")
         for asset_key in execution_order:
             self._materialize_one(asset_key, force_recompute=force_recompute)
 
@@ -162,22 +158,16 @@ class FeatureService(Generic[S]):
         all_prov = self._ms.all_provenance(asset_key=asset_key)
         if not all_prov: return
         
-        # Sort by timestamp if available, otherwise just use list order. For demo, we assume order.
-        all_prov.sort(key=lambda p: p.data_version, reverse=True) # A bit of a hack for demo
-        
+        all_prov.sort(key=lambda p: p.data_version, reverse=True)
         versions_to_delete = set()
         if keep_last_n is not None:
             versions_to_delete.update(p.data_version for p in all_prov[keep_last_n:])
-            
-        # A real implementation would store timestamps with provenance.
-        # This part is conceptual for the demo.
         if max_age is not None:
-             self.logger(f"WARNING: Pruning by max_age is not fully implemented in this demo.")
+            self.logger(f"WARNING: Pruning by max_age is not fully implemented in this demo.")
 
         if versions_to_delete:
             versions_list = list(versions_to_delete)
             self.logger(f"  - Pruning {len(versions_list)} versions from stores.")
-            # Prune from both stores
             self._fs.prune_data_versions(asset_key=asset_key, versions_to_delete=versions_list)
             self._ms.prune_provenance(asset_key=asset_key, versions_to_delete=versions_list)
 
@@ -196,10 +186,7 @@ class FeatureService(Generic[S]):
             return self._fs.read_version(asset_key, latest_stored.data_version)
 
         self.logger(f"[{asset_key}] EXECUTING: Cache miss, computing new version.")
-        upstream_data = {
-            dep_key: self._fs.read_version(dep_key, self._ms.latest_provenance(dep_key).data_version)
-            for dep_key in definition.dependencies
-        }
+        upstream_data = {dep: self._fs.read_version(dep, self._ms.latest_provenance(dep).data_version) for dep in definition.dependencies}
         df = definition.compute_fn(upstream_data)
         dv = DataVersion(str(df.hash_rows().sum()))
 
@@ -230,26 +217,19 @@ class LocalParquetFeatureStore(FeatureStore[str]):
         asset_dir = self.base_dir / asset_key
         if not asset_dir.exists(): return
         for version_dir in asset_dir.iterdir():
-            if version_dir.is_dir():
-                data_file = version_dir / "data.parquet"
-                if data_file.exists():
-                    df = pl.read_parquet(data_file)
-                    if "__row_id" in df.columns:
-                        filtered_df = df.filter(~pl.col("__row_id").is_in(list(row_ids)))
-                        if len(filtered_df) < len(df):
-                            filtered_df.write_parquet(data_file)
+            if version_dir.is_dir() and (data_file := version_dir / "data.parquet").exists():
+                df = pl.read_parquet(data_file)
+                if "__row_id" in df.columns and len(filtered_df := df.filter(~pl.col("__row_id").is_in(list(row_ids)))) < len(df):
+                    filtered_df.write_parquet(data_file)
     def prune_data_versions(self, *, asset_key: str, versions_to_delete: List[DataVersion]) -> None:
         asset_dir = self.base_dir / asset_key
         if not asset_dir.exists(): return
         for version in versions_to_delete:
-            version_path = asset_dir / version
-            if version_path.exists():
-                shutil.rmtree(version_path)
+            if (version_path := asset_dir / version).exists(): shutil.rmtree(version_path)
 
 class InMemoryMetadataStore(MetadataStore[str]):
     def __init__(self):
-        self._db: Dict[str, List[Provenance]] = {}
-        self._lookup: Dict[tuple[str, DataVersion], Provenance] = {}
+        self._db: Dict[str, List[Provenance]] = {}; self._lookup: Dict[tuple[str, DataVersion], Provenance] = {}
     def write_provenance(self, *, asset_key: str, provenance: Provenance):
         if (asset_key, provenance.data_version) not in self._lookup:
             self._db.setdefault(asset_key, []).append(provenance)
@@ -257,55 +237,39 @@ class InMemoryMetadataStore(MetadataStore[str]):
     def latest_provenance(self, *, asset_key: str) -> Provenance | None:
         return self._db.get(asset_key, [])[-1] if self._db.get(asset_key) else None
     def all_provenance(self, *, asset_key: str) -> List[Provenance]: return self._db.get(asset_key, []).copy()
-    def update_provenance_status(self, *, asset_key: str, data_version: DataVersion, status: ValidationStatus) -> bool:
-        prov = self._lookup.get((asset_key, data_version))
-        if not prov: return False
-        new_prov = Provenance(prov.code_version, prov.data_version, prov.parent_hash, status)
-        history = self._db[asset_key]
-        history[history.index(prov)] = new_prov
-        self._lookup[(asset_key, data_version)] = new_prov
-        return True
     def prune_provenance(self, *, asset_key: str, versions_to_delete: List[DataVersion]) -> None:
         if asset_key in self._db:
             self._db[asset_key] = [p for p in self._db[asset_key] if p.data_version not in versions_to_delete]
             for version in versions_to_delete:
-                if (asset_key, version) in self._lookup:
-                    del self._lookup[(asset_key, version)]
+                if (asset_key, version) in self._lookup: del self._lookup[(asset_key, version)]
 
 # ==================================================================================
 # PART 2: THE DAGSTER INTEGRATION LAYER
 # ==================================================================================
 
 class FeaturePlatformResource(ConfigurableResource):
-    base_dir: str = tempfile.gettempdir()
+    feature_store: FeatureStore
+    metadata_store: MetadataStore
     def get_service(self, registry: FeatureRegistry) -> FeatureService:
-        fs = LocalParquetFeatureStore(base_dir=Path(self.base_dir))
-        ms = InMemoryMetadataStore()
-        return FeatureService(registry=registry, feature_store=fs, metadata_store=ms)
+        return FeatureService(registry=registry, feature_store=self.feature_store, metadata_store=self.metadata_store)
 
 def add_row_id(df: pl.DataFrame, entity_keys: List[str]) -> pl.DataFrame:
     return df.with_columns(__row_id=pl.concat_str([pl.col(k).cast(pl.Utf8) for k in entity_keys]).hash())
 
-feature_definitions = [
-    FeatureDefinition("users", lambda _: add_row_id(pl.DataFrame({"user_id": [1, 2, 3]}), ["user_id"]), ["user_id"], ["user_id"]),
-    FeatureDefinition("locations", lambda up: add_row_id(up["users"].with_columns(country=pl.lit("USA")), ["user_id"]), ["country"], ["user_id"], ["users"]),
-]
-feature_registry = FeatureRegistry(definitions=feature_definitions)
+users_def = FeatureDefinition("users", lambda _: add_row_id(pl.DataFrame({"user_id": [1, 2, 3]}), ["user_id"]), ["user_id"], ["user_id"])
+locations_def = FeatureDefinition("locations", lambda up: add_row_id(up["users"], ["user_id"]).with_columns(country=pl.lit("USA")), ["country"], ["user_id"], ["users"])
+feature_registry = FeatureRegistry(definitions=[users_def, locations_def])
 
 def build_feature_assets(registry: FeatureRegistry, resource_key: str) -> list:
     assets = []
     for asset_key, definition in registry.definitions.items():
-        @multi_asset(
-            name=definition.asset_key,
-            group_name="feature_platform",
-            required_resource_keys={resource_key},
-            outs={asset_key: AssetOut()},
-            internal_asset_deps={AssetKey(definition.asset_key): {AssetKey(dep) for dep in definition.dependencies}}
-        )
-        def _dynamic_asset(context: AssetExecutionContext, **kwargs):
-            service = context.resources[resource_key].get_service(registry)
-            service._materialize_one(asset_key=context.asset_key.to_user_string(), force_recompute=False)
-        assets.append(_dynamic_asset)
+        def _create_compute_fn(def_closure: FeatureDefinition):
+            @multi_asset(name=def_closure.asset_key, group_name="feature_platform", required_resource_keys={resource_key}, outs={def_closure.asset_key: AssetOut()}, internal_asset_deps={AssetKey(def_closure.asset_key): {AssetKey(dep) for dep in def_closure.dependencies}})
+            def _dynamic_asset(context: AssetExecutionContext, **kwargs):
+                service = context.resources[resource_key].get_service(registry)
+                yield service._materialize_one(asset_key=context.asset_key.to_user_string(), force_recompute=False)
+            return _dynamic_asset
+        assets.append(_create_compute_fn(definition))
     return assets
 
 dagster_feature_assets = build_feature_assets(feature_registry, "feature_platform")
@@ -314,7 +278,7 @@ dagster_feature_assets = build_feature_assets(feature_registry, "feature_platfor
 def prune_all_op(context):
     service = context.resources.feature_platform.get_service(feature_registry)
     for asset_key in service.registry.definitions:
-        service.prune_asset_versions(asset_key=asset_key, keep_last_n=1) # Keep only the latest version
+        service.prune_asset_versions(asset_key=asset_key, keep_last_n=1)
 
 class DeleteEntityConfig(Config):
     start_asset: str = "users"
@@ -332,8 +296,52 @@ def maintenance_job():
 
 defs = Definitions(
     assets=dagster_feature_assets,
-    resources={"feature_platform": FeaturePlatformResource()},
+    resources={"feature_platform": FeaturePlatformResource(
+        feature_store=LocalParquetFeatureStore(base_dir=Path(tempfile.gettempdir())),
+        metadata_store=InMemoryMetadataStore()
+    )},
     jobs=[maintenance_job],
 )
 
-# To run: `dagster dev -f feature_platform_complete_final.py`
+# ==================================================================================
+# PART 3: STANDALONE EXECUTION AND DEMONSTRATION
+# ==================================================================================
+
+if __name__ == "__main__":
+    print("\n" + "="*80 + "\n--- RUNNING STANDALONE DEMONSTRATION ---\n" + "="*80)
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fs = LocalParquetFeatureStore(base_dir=Path(tmpdir))
+        ms = InMemoryMetadataStore()
+        service = FeatureService(registry=feature_registry, feature_store=fs, metadata_store=ms)
+
+        print("\n--- SCENARIO 1: Create multiple versions ---")
+        service.materialize() # Version 1
+        feature_registry.definitions["locations"] = feature_registry.definitions["locations"]._replace(code_version="1.1")
+        service.materialize() # Version 2
+        feature_registry.definitions["locations"] = feature_registry.definitions["locations"]._replace(code_version="1.2")
+        service.materialize() # Version 3
+        
+        print(f"Total versions for 'locations' before prune: {len(ms.all_provenance('locations'))}")
+        assert len(ms.all_provenance('locations')) == 3
+        assert len(list((Path(tmpdir) / "locations").iterdir())) == 3
+
+        print("\n--- SCENARIO 2: Prune versions, keeping only the latest one ---")
+        service.prune_asset_versions(asset_key="locations", keep_last_n=1)
+        print(f"Total versions for 'locations' after prune: {len(ms.all_provenance('locations'))}")
+        assert len(ms.all_provenance('locations')) == 1
+        assert len(list((Path(tmpdir) / "locations").iterdir())) == 1
+
+        print("\n--- SCENARIO 3: Delete data for a specific entity ---")
+        latest_prov = ms.latest_provenance("users")
+        df_before = fs.read_version("users", latest_prov.data_version)
+        print(f"User count before deletion: {len(df_before)}")
+        assert len(df_before) == 3
+
+        service.delete_entity_data(start_asset="users", entity_key_values={"user_id": 2}, cascade=True)
+        df_after = fs.read_version("users", latest_prov.data_version)
+        print(f"User count after deleting user 2: {len(df_after)}")
+        assert len(df_after) == 2
+        assert 2 not in df_after["user_id"].to_list()
+
+        print("\n--- DEMONSTRATION COMPLETE ---")
