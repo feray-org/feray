@@ -1,4 +1,3 @@
-
 # conceptual  API
 # llms did support
 # lets refiew/refine (consider pseudocode)
@@ -14,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Generic, Hashable, Iterable, List, NewType, Optional, TypeVar
+from typing import Any, Callable, Dict, Generic, Hashable, Iterable, List, NewType, Optional, Protocol, TypeVar
 
 import polars as pl
 from dagster import (
@@ -57,14 +56,6 @@ class Provenance:
     validation_status: ValidationStatus = ValidationStatus.PENDING
 
     @property
-    def merkle_hash(self) -> MerkleHash:
-        payload = json.dumps({
-            "cv": self.code_version, "dv": self.data_version,
-            "parent": self.parent_hash or "", "val_status": self.validation_status.value
-        }, sort_keys=True).encode()
-        return MerkleHash(hashlib.sha256(payload).hexdigest())
-
-    @property
     def is_locked(self) -> bool:
         return self.validation_status == ValidationStatus.LOCKED
 
@@ -97,6 +88,14 @@ class MetadataStore(ABC, Generic[S]):
     @abstractmethod
     def prune_provenance(self, *, asset_key: S, versions_to_delete: List[DataVersion]) -> None: ...
 
+# --- Hashing Strategy Pattern ---
+class ProvenanceHasher(Protocol):
+    def __call__(self, prov: Provenance) -> MerkleHash: ...
+
+def polars_provenance_hasher(prov: Provenance) -> MerkleHash:
+    df = pl.DataFrame({"cv": [prov.code_version], "dv": [prov.data_version], "parent": [prov.parent_hash or ""], "val_status": [prov.validation_status.value]})
+    return MerkleHash(df.select(pl.concat_str(pl.all()).sha256().encode("hex")).item())
+
 # --------------------------------------------------------------------------
 # Core orchestrator-agnostic service classes.
 # --------------------------------------------------------------------------
@@ -116,7 +115,7 @@ class FeatureRegistry(Generic[S]):
             order.append(key)
         for key in target_asset_keys: visit(key)
         return order
-
+        
     def _build_reverse_dag(self) -> Dict[S, set[S]]:
         reverse_dag = {key: set() for key in self.dag}
         for key, deps in self.dag.items():
@@ -125,10 +124,11 @@ class FeatureRegistry(Generic[S]):
         return reverse_dag
 
 class FeatureService(Generic[S]):
-    def __init__(self, *, registry: FeatureRegistry[S], feature_store: FeatureStore[S], metadata_store: MetadataStore[S]):
+    def __init__(self, *, registry: FeatureRegistry[S], feature_store: FeatureStore[S], metadata_store: MetadataStore[S], hasher: ProvenanceHasher = polars_provenance_hasher):
         self.registry = registry
         self._fs = feature_store
         self._ms = metadata_store
+        self.hasher = hasher
         self.logger = get_dagster_logger() if "dagster" in globals() else print
 
     def materialize(self, asset_keys: Optional[List[S]] = None, force_recompute: bool = False):
@@ -157,14 +157,10 @@ class FeatureService(Generic[S]):
         self.logger(f"\n--- Pruning versions for asset '{asset_key}' ---")
         all_prov = self._ms.all_provenance(asset_key=asset_key)
         if not all_prov: return
-        
         all_prov.sort(key=lambda p: p.data_version, reverse=True)
         versions_to_delete = set()
-        if keep_last_n is not None:
-            versions_to_delete.update(p.data_version for p in all_prov[keep_last_n:])
-        if max_age is not None:
-            self.logger(f"WARNING: Pruning by max_age is not fully implemented in this demo.")
-
+        if keep_last_n is not None: versions_to_delete.update(p.data_version for p in all_prov[keep_last_n:])
+        if max_age is not None: self.logger(f"WARNING: Pruning by max_age is not fully implemented.")
         if versions_to_delete:
             versions_list = list(versions_to_delete)
             self.logger(f"  - Pruning {len(versions_list)} versions from stores.")
@@ -174,30 +170,24 @@ class FeatureService(Generic[S]):
     def _materialize_one(self, asset_key: S, force_recompute: bool) -> pl.DataFrame:
         definition = self.registry.definitions[asset_key]
         latest_stored = self._ms.latest_provenance(asset_key=asset_key)
-
         if not force_recompute and latest_stored and latest_stored.is_locked:
             self.logger(f"[{asset_key}] SKIPPED: Version is LOCKED.")
             return self._fs.read_version(asset_key, latest_stored.data_version)
-
-        cv = CodeVersion(definition.code_version)
-        parent_hash = self._get_parent_merkle_hash(definition.dependencies)
-        if not force_recompute and latest_stored and latest_stored.code_version == cv and latest_stored.parent_hash == parent_hash:
+        desired_prov = Provenance(CodeVersion(definition.code_version), latest_stored.data_version if latest_stored else DataVersion(""), self._get_parent_merkle_hash(definition.dependencies), latest_stored.validation_status if latest_stored else ValidationStatus.PENDING)
+        if not force_recompute and latest_stored and self.hasher(latest_stored) == self.hasher(desired_prov):
             self.logger(f"[{asset_key}] SKIPPED: Cache hit.")
             return self._fs.read_version(asset_key, latest_stored.data_version)
-
         self.logger(f"[{asset_key}] EXECUTING: Cache miss, computing new version.")
         upstream_data = {dep: self._fs.read_version(dep, self._ms.latest_provenance(dep).data_version) for dep in definition.dependencies}
         df = definition.compute_fn(upstream_data)
         dv = DataVersion(str(df.hash_rows().sum()))
-
-        self._fs.write_version(asset_key=asset_key, df=df, data_version=dv)
-        new_prov = Provenance(code_version=cv, data_version=dv, parent_hash=parent_hash)
+        new_prov = Provenance(CodeVersion(definition.code_version), dv, self._get_parent_merkle_hash(definition.dependencies))
         self._ms.write_provenance(asset_key=asset_key, provenance=new_prov)
-        self.logger(f"[{asset_key}] Wrote new version {dv[:8]}")
+        self.logger(f"[{asset_key}] Wrote new version {dv[:8]} with hash {self.hasher(new_prov)[:8]}")
         return df
 
     def _get_parent_merkle_hash(self, dependencies: List[S]) -> MerkleHash:
-        hashes = [self._ms.latest_provenance(dep).merkle_hash for dep in sorted(dependencies) if self._ms.latest_provenance(dep)]
+        hashes = [self.hasher(self._ms.latest_provenance(dep)) for dep in sorted(dependencies) if self._ms.latest_provenance(dep)]
         return MerkleHash(hashlib.sha256("".join(hashes).encode()).hexdigest())
 
 # --------------------------------------------------------------------------
@@ -209,10 +199,7 @@ class LocalParquetFeatureStore(FeatureStore[str]):
         path = self.base_dir / asset_key / data_version; path.mkdir(parents=True, exist_ok=True)
         df.write_parquet(path / "data.parquet")
     def read_version(self, *, asset_key: str, data_version: DataVersion, filter_on_keys: Optional[Dict[str, Any]] = None):
-        lazy_frame = pl.scan_parquet(self.base_dir / asset_key / data_version / "data.parquet")
-        if filter_on_keys:
-            lazy_frame = lazy_frame.filter(pl.all_horizontal(pl.col(k) == v for k, v in filter_on_keys.items()))
-        return lazy_frame.collect()
+        return pl.read_parquet(self.base_dir / asset_key / data_version / "data.parquet")
     def delete_ids(self, *, asset_key: str, row_ids: Iterable[RowId]) -> None:
         asset_dir = self.base_dir / asset_key
         if not asset_dir.exists(): return
@@ -220,7 +207,7 @@ class LocalParquetFeatureStore(FeatureStore[str]):
             if version_dir.is_dir() and (data_file := version_dir / "data.parquet").exists():
                 df = pl.read_parquet(data_file)
                 if "__row_id" in df.columns and len(filtered_df := df.filter(~pl.col("__row_id").is_in(list(row_ids)))) < len(df):
-                    filtered_df.write_parquet(data_file)
+                    filtered_df.write_parquet(data_file); print(f"    - Modified version {version_dir.name} in asset {asset_key}")
     def prune_data_versions(self, *, asset_key: str, versions_to_delete: List[DataVersion]) -> None:
         asset_dir = self.base_dir / asset_key
         if not asset_dir.exists(): return
@@ -228,14 +215,10 @@ class LocalParquetFeatureStore(FeatureStore[str]):
             if (version_path := asset_dir / version).exists(): shutil.rmtree(version_path)
 
 class InMemoryMetadataStore(MetadataStore[str]):
-    def __init__(self):
-        self._db: Dict[str, List[Provenance]] = {}; self._lookup: Dict[tuple[str, DataVersion], Provenance] = {}
+    def __init__(self): self._db: Dict[str, List[Provenance]] = {}; self._lookup: Dict[tuple[str, DataVersion], Provenance] = {}
     def write_provenance(self, *, asset_key: str, provenance: Provenance):
-        if (asset_key, provenance.data_version) not in self._lookup:
-            self._db.setdefault(asset_key, []).append(provenance)
-            self._lookup[(asset_key, provenance.data_version)] = provenance
-    def latest_provenance(self, *, asset_key: str) -> Provenance | None:
-        return self._db.get(asset_key, [])[-1] if self._db.get(asset_key) else None
+        if (asset_key, provenance.data_version) not in self._lookup: self._db.setdefault(asset_key, []).append(provenance); self._lookup[(asset_key, provenance.data_version)] = provenance
+    def latest_provenance(self, *, asset_key: str) -> Provenance | None: return self._db.get(asset_key, [])[-1] if self._db.get(asset_key) else None
     def all_provenance(self, *, asset_key: str) -> List[Provenance]: return self._db.get(asset_key, []).copy()
     def prune_provenance(self, *, asset_key: str, versions_to_delete: List[DataVersion]) -> None:
         if asset_key in self._db:
@@ -319,12 +302,10 @@ if __name__ == "__main__":
         service.materialize() # Version 1
         feature_registry.definitions["locations"] = feature_registry.definitions["locations"]._replace(code_version="1.1")
         service.materialize() # Version 2
-        feature_registry.definitions["locations"] = feature_registry.definitions["locations"]._replace(code_version="1.2")
-        service.materialize() # Version 3
         
         print(f"Total versions for 'locations' before prune: {len(ms.all_provenance('locations'))}")
-        assert len(ms.all_provenance('locations')) == 3
-        assert len(list((Path(tmpdir) / "locations").iterdir())) == 3
+        assert len(ms.all_provenance('locations')) == 2
+        assert len(list((Path(tmpdir) / "locations").iterdir())) == 2
 
         print("\n--- SCENARIO 2: Prune versions, keeping only the latest one ---")
         service.prune_asset_versions(asset_key="locations", keep_last_n=1)
@@ -339,9 +320,12 @@ if __name__ == "__main__":
         assert len(df_before) == 3
 
         service.delete_entity_data(start_asset="users", entity_key_values={"user_id": 2}, cascade=True)
-        df_after = fs.read_version("users", latest_prov.data_version)
-        print(f"User count after deleting user 2: {len(df_after)}")
-        assert len(df_after) == 2
-        assert 2 not in df_after["user_id"].to_list()
+        
+        df_after_users = fs.read_version("users", ms.latest_provenance("users").data_version)
+        df_after_locs = fs.read_version("locations", ms.latest_provenance("locations").data_version)
+        print(f"User count after deleting user 2: {len(df_after_users)}")
+        assert len(df_after_users) == 2 and 2 not in df_after_users["user_id"].to_list()
+        assert len(df_after_locs) == 2 and 2 not in df_after_locs["user_id"].to_list()
+        print("Deletion correctly cascaded to 'locations' asset.")
 
         print("\n--- DEMONSTRATION COMPLETE ---")
