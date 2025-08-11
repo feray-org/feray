@@ -1,20 +1,29 @@
 [project]
 name = "dagster-feray"
 version = "0.1.1"
-description = "dagster integration for feray"
+description = "dagster integration for feRay"
 readme = "README.md"
 authors = [
-    { name = "danielgafni", email = "danielgafni16@gmail.com" },
-    { name = "geoheil", email = "georg.kf.heiler@gmail.com" }
+  { name = "danielgafni", email = "danielgafni16@gmail.com" },
+  { name = "geoheil", email = "georg.kf.heiler@gmail.com" },
+]
+license = { text = "Apache-2.0" }
+keywords = ["dagster", "workflow-orchestration", "ray", "feray"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Distributed Computing",
+  "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.12"
-dependencies = [
-    "feray",
-    "dagster>=1.11",
-]
+dependencies = ["feray", "dagster>=1.11"]
 
 [tool.uv.sources]
-feray = { workspace = true }    
+feray = { workspace = true }
 
 [tool.uv.build-backend]
 module-root = ""
@@ -22,3 +31,9 @@ module-root = ""
 [build-system]
 requires = ["uv_build>=0.7.20,<0.8.0"]
 build-backend = "uv_build"
+
+[project.urls]
+Homepage = "https://github.com/danielgafni/feray/"
+Repository = "https://github.com/danielgafni/feray"
+Documentation = "https://github.com/danielgafni/feray/docs/dagster"
+"Bug Reports" = "https://github.com/danielgafni/feray/issues"

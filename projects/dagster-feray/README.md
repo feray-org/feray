@@ -1,1 +1,3 @@
-# dagster-feray
+# dagster-feRay
+
+[dagster](https://dagster.io/) integration for [feRay](https://github.com/danielgafni/feray)

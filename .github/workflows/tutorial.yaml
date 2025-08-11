@@ -1,0 +1,36 @@
+name: Validation of tutorial code
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'examples/**'
+      - 'projects/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [ main ]
+    paths:
+      - 'examples/**'
+      - 'projects/**'
+  workflow_dispatch:
+
+concurrency:
+  group: tutorial-main-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    name: Validate tutorial
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: prefix-dev/setup-pixi@v0.8.14
+        with:
+            pixi-version: v0.50.2
+            cache: true
+            frozen: true
+      - run: cd examples && pixi run -e dev --frozen lint
+
+      - run: cd examples && pixi run -e dev --frozen test

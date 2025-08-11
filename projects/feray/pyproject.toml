@@ -4,25 +4,41 @@ version = "0.1.1"
 description = "Memoization-enabled feature store on ray"
 readme = "README.md"
 authors = [
-    { name = "danielgafni", email = "danielgafni16@gmail.com" },
-    { name = "geoheil", email = "georg.kf.heiler@gmail.com" }
+  { name = "danielgafni", email = "danielgafni16@gmail.com" },
+  { name = "geoheil", email = "georg.kf.heiler@gmail.com" },
 ]
 requires-python = ">=3.12,<3.13"
+license = { text = "Apache-2.0" }
+keywords = ["dagster", "ray", "feray", "featurestore"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Distributed Computing",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
-    "ibis>=3.3.0",
-    "polars>=1.31.0",
-    "polars-hash>=0.5.4",
-    "sqlmodel>=0.0.24",
+  "ibis>=3.3.0",
+  "polars>=1.31.0",
+  "polars-hash>=0.5.4",
+  "sqlmodel>=0.0.24",
 ]
 
 [project.optional-dependencies]
-ray = [
-    "ray>=2.47.1",
-]
+ray = ["ray>=2.48.0"]
 
 [tool.uv.build-backend]
 module-root = ""
 
 [build-system]
-requires = ["uv_build>=0.8.6,<0.9"]
+requires = ["uv_build>=0.8.8,<0.9"]
 build-backend = "uv_build"
+
+[project.urls]
+Homepage = "https://github.com/danielgafni/feray/"
+Repository = "https://github.com/danielgafni/feray"
+Documentation = "https://github.com/danielgafni/feray/docs/intro"
+"Bug Reports" = "https://github.com/danielgafni/feray/issues"
