@@ -1,6 +1,6 @@
 [project]
 name = "feray"
-version = "0.1.1"
+version = "0.0.0-rc.1"
 description = "Memoization-enabled feature store on ray"
 readme = "README.md"
 authors = [
