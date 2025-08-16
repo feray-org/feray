@@ -52,4 +52,3 @@ def subtract(a: float, b: float) -> float:
         float: The difference between a and b.
     """
     return a - b
-

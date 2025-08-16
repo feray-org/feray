@@ -38,6 +38,10 @@ Further reading material
 
 ## TODO - next steps
 
+> https://github.com/orgs/feray-org/projects/1/views/1
+
+> https://feray-org.github.io/feray/
+
 - Align on API
     - clarify recently added features
       - processing a single row
