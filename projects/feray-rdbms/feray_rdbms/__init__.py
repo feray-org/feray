@@ -1,5 +1,5 @@
 def hello() -> str:
-    return "Hello from feray!"
+    return "Hello from feray-rdbms!"
 
 
 __all__ = [
