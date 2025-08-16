@@ -38,7 +38,7 @@ requires = ["uv_build>=0.8.8,<0.9"]
 build-backend = "uv_build"
 
 [project.urls]
-Homepage = "https://github.com/danielgafni/feray/"
-Repository = "https://github.com/danielgafni/feray"
-Documentation = "https://github.com/danielgafni/feray/docs/intro"
-"Bug Reports" = "https://github.com/danielgafni/feray/issues"
+Homepage = "https://github.com/feray-org/"
+Repository = "https://github.com/feray-org"
+Documentation = "https://github.com/feray-org/docs/intro"
+"Bug Reports" = "https://github.com/feray-org/issues"

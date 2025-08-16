@@ -33,7 +33,7 @@ def defs():
 
     all_assets = dg.link_code_references_to_git(
         assets_defs=all_assets,
-        git_url="https://github.com/danielgafni/feray",
+        git_url="https://github.com/feray-org",
         git_branch="main",
         file_path_mapping=dg.AnchorBasedFilePathMapping(
             local_file_anchor=Path(__file__).parent,

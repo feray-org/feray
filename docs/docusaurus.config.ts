@@ -42,7 +42,7 @@ const config: Config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/danielgafni/feray/tree/main/docs',
+            'https://github.com/feray-org/tree/main/docs',
         },
         blog: false,
         // blog: {
@@ -54,7 +54,7 @@ const config: Config = {
         //   // Please change this to your repo.
         //   // Remove this to remove the "edit this page" links.
         //   editUrl:
-        //     'https://github.com/danielgafni/feray/tree/main/docs/blog',
+        //     'https://github.com/feray-org/tree/main/docs/blog',
         //   // Useful options to enforce blogging best practices
         //   onInlineTags: 'warn',
         //   onInlineAuthors: 'warn',
@@ -85,7 +85,7 @@ const config: Config = {
         },
         // {to: '/blog', label: 'Blog', position: 'left'},
         {
-          href: 'https://github.com/danielgafni/feray',
+          href: 'https://github.com/feray-org',
           label: 'GitHub',
           position: 'right',
         },
@@ -129,7 +129,7 @@ const config: Config = {
             // },
             {
               label: 'GitHub',
-              href: 'https://github.com/danielgafni/feray',
+              href: 'https://github.com/feray-org',
             },
           ],
         },

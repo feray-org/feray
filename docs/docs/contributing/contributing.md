@@ -19,7 +19,7 @@ You have to have uv installed for the library development - but pixi for executi
 ### Development setup
 
 ```bash
-git clone https://github.com/danielgafni/feray.git
+git clone https://github.com/feray-org.git
 cd feray
 pixi run pre-commit-install
 pixi run pre-commit-run
