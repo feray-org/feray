@@ -16,12 +16,3 @@ This section covers the main components of the library.
    :undoc-members:
    :show-inheritance:
 
-Calculator Example
-==================
-
-A simple module to demonstrate functionality.
-
-.. automodule:: feray.calculator
-   :members:
-   :undoc-members:
-   :show-inheritance:

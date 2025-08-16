@@ -1,7 +1,7 @@
 [project]
-name = "feray-rdbms"
+name = "feray-sql"
 version = "1.0.0"
-description = "RDBMS integration for feRay"
+description = "SQL integration for feRay"
 readme = "README.md"
 authors = [
   { name = "danielgafni", email = "danielgafni16@gmail.com" },

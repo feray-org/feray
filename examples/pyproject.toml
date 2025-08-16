@@ -75,7 +75,7 @@ dagster-webserver = ">=1.11.0,<1.12"
 [tool.pixi.feature.controlplane-workload.dependencies]
 [tool.pixi.feature.controlplane-workload.pypi-dependencies]
 feray_polars = { path = "../projects/feray-polars", editable = true }
-feray_rdbms = { path = "../projects/feray-rdbms", editable = true }
+feray_sql = { path = "../projects/feray-sql", editable = true }
 
 
 [tool.pixi.feature.ray-workload.dependencies]
