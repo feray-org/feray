@@ -1232,8 +1232,8 @@ packages:
   requires_python: '>=3.9,<3.14'
 - pypi: ./projects/dagster-feray
   name: dagster-feray
-  version: 0.0.0rc1
-  sha256: a5fdd7d9c8b16fa1b7b1987066f27279babfdaf32bb8ad31030a53e1fc1d3ed8
+  version: 0.0.0rc2
+  sha256: 11b823db248de42807155ab7cc09be3712a98233eea2c85118320cb3ae5fb7b5
   requires_dist:
   - feray @ file:///home/runner/work/feray/feray/projects/feray
   - dagster>=1.11
@@ -1282,8 +1282,8 @@ packages:
   timestamp: 1733217860944
 - pypi: ./projects/feray
   name: feray
-  version: 0.0.0rc1
-  sha256: e848aa29b7f550820d0bfbd5a16fbaad0755c98988d4c82f3b207706e2969530
+  version: 0.0.0rc2
+  sha256: d68b4a1c32c78b31f0eb821df01e82d37c1e714520075f96046b293aac8e963d
   requires_dist:
   - ibis>=3.3.0
   - polars>=1.31.0
