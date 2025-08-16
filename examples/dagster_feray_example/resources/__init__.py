@@ -1,11 +1,47 @@
 import os
+import tempfile
+from pathlib import Path
 
 import dagster as dg
+import polars as pl
 from dagster_ray import LocalRay
+from feray.protocols import FeatureStore, MetadataStore
+from feray.service import FeatureRegistry, FeatureService
+from feray_polars.dummy.in_memory_metadata import InMemoryMetadataStore
+from feray_polars.dummy.parquet_store import LocalParquetFeatureStore
+from feray_polars.utils import (
+    polars_add_row_id_fn,
+    polars_data_version_fn,
+    polars_provenance_hasher,
+)
 
 from dagster_feray_example.resources.lazy_local_ray import (
     PipesRayJobClientLazyLocalResource,
 )
+
+
+class PolarsFeaturePlatformResource(dg.ConfigurableResource):
+    """
+    Dagster resource to provide access to the core feature platform service.
+    This resource is configured with concrete store implementations.
+    """
+
+    feature_store: FeatureStore[str, pl.DataFrame]
+    metadata_store: MetadataStore[str]
+
+    def get_service(
+        self, registry: FeatureRegistry[str, pl.DataFrame]
+    ) -> FeatureService[str, pl.DataFrame]:
+        """Constructs and returns the main FeatureService."""
+        return FeatureService(
+            registry=registry,
+            feature_store=self.feature_store,
+            metadata_store=self.metadata_store,
+            hasher=polars_provenance_hasher,
+            data_version_fn=polars_data_version_fn,
+            row_id_fn=polars_add_row_id_fn,
+        )
+
 
 local_ray = LocalRay(
     ray_init_options={
@@ -18,6 +54,12 @@ local_ray = LocalRay(
 RESOURCES_LOCAL = {
     "ray_cluster": local_ray,
     "pipes_ray_job_client": PipesRayJobClientLazyLocalResource(ray_cluster=local_ray),
+    "feature_platform": PolarsFeaturePlatformResource(
+        feature_store=LocalParquetFeatureStore(
+            base_dir=Path(tempfile.gettempdir()) / "dagster_feature_store"
+        ),
+        metadata_store=InMemoryMetadataStore(hasher=polars_provenance_hasher),
+    ),
 }
 
 resource_defs_by_deployment_name = {

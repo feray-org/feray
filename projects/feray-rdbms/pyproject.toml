@@ -20,7 +20,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.12"
-dependencies = ["feray", "sqlmodel>=0.0.24", ]
+dependencies = ["feray", "sqlmodel>=0.0.24"]
 
 [tool.uv.sources]
 feray = { workspace = true }

@@ -2,9 +2,9 @@ import dataclasses
 import tempfile
 from pathlib import Path
 
-# --- Assumed imports (based on your original file) ---
 import polars as pl
-from feray.data_structures import FeatureDefinition, StorageId  # <-- Import StorageId
+from feray.data_structures import FeatureDefinition, StorageId
+from feray.service import FeatureRegistry, FeatureService
 from feray_polars.dummy.in_memory_metadata import InMemoryMetadataStore
 from feray_polars.dummy.parquet_store import LocalParquetFeatureStore
 from feray_polars.utils import (
@@ -12,10 +12,8 @@ from feray_polars.utils import (
     polars_data_version_fn,
     polars_provenance_hasher,
 )
-from feray.service import FeatureRegistry, FeatureService
 from loguru import logger as logging
 
-# --- Define features and registry within the script ---
 users_def = FeatureDefinition(
     asset_key="users",
     compute_fn=lambda _: pl.DataFrame({"user_id": [1, 2, 3]}),
@@ -74,7 +72,6 @@ if __name__ == "__main__":
         print("\n--- SCENARIO 3 & 4: Demonstrate reads and deletes ---")
         latest_users_prov = ms.latest_provenance(asset_key="users")
         if latest_users_prov:
-            # --- THE FIX: Explicitly cast the MerkleHash to a StorageId ---
             latest_users_storage_id = StorageId(service.hasher(latest_users_prov))
 
             user_1_data = fs.read_for_keys(
@@ -100,7 +97,6 @@ if __name__ == "__main__":
             locs_prov_after_delete = ms.latest_provenance(asset_key="locations")
 
             if users_prov_after_delete and locs_prov_after_delete:
-                # --- THE FIX: Apply the same cast here ---
                 users_storage_id_after = StorageId(
                     service.hasher(users_prov_after_delete)
                 )

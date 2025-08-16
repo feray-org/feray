@@ -9,6 +9,10 @@ warnings.filterwarnings("ignore", category=dagster_warnings.PreviewWarning)
 
 from pathlib import Path
 
+from examples.dagster_feray_example.defs.features.feature_example import (
+    dagster_feature_assets as feature_assets,
+)
+
 from dagster_feray_example import defs as example_defs
 from dagster_feray_example.defs import ray as ray_defs
 from dagster_feray_example.resources import get_resources_for_deployment
@@ -26,6 +30,7 @@ def defs():
                 | dg.AutomationCondition.on_missing(),
                 group_name="ray_example",
             ),
+            *feature_assets,
         ]
     )
 
