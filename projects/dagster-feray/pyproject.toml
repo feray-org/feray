@@ -1,6 +1,6 @@
 [project]
 name = "dagster-feray"
-version = "0.0.0-rc.2"
+version = "1.0.0"
 description = "dagster integration for feRay"
 readme = "README.md"
 authors = [

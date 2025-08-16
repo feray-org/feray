@@ -217,7 +217,7 @@ wheels = [
 
 [[package]]
 name = "dagster-feray"
-version = "0.0.0rc2"
+version = "1.0.0"
 source = { editable = "projects/dagster-feray" }
 dependencies = [
     { name = "dagster" },
@@ -296,7 +296,7 @@ wheels = [
 
 [[package]]
 name = "feray"
-version = "0.0.0rc2"
+version = "1.0.0"
 source = { editable = "projects/feray" }
 dependencies = [
     { name = "ibis" },
@@ -322,7 +322,7 @@ provides-extras = ["ray"]
 
 [[package]]
 name = "feray-workspace"
-version = "0.0.0rc2"
+version = "1.0.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
