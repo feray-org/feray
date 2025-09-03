@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore", category=dagster_warnings.PreviewWarning)
 
 from pathlib import Path
 
-from examples.dagster_feray_example.defs.features.feature_example import (
+from dagster_feray_example.defs.features.feature_example import (
     dagster_feature_assets as feature_assets,
 )
 
