@@ -15,13 +15,3 @@ This section covers the main components of the library.
    :members:
    :undoc-members:
    :show-inheritance:
-
-Calculator Example
-==================
-
-A simple module to demonstrate functionality.
-
-.. automodule:: dagster_feray.calculator
-   :members:
-   :undoc-members:
-   :show-inheritance:

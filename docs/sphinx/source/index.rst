@@ -17,4 +17,6 @@ documentation for details.
 
    api_core
    api_dagster
+   api_feray_sql
+   api_feray_polars
 

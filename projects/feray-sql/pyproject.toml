@@ -1,0 +1,39 @@
+[project]
+name = "feray-sql"
+version = "1.0.0"
+description = "SQL integration for feRay"
+readme = "README.md"
+authors = [
+  { name = "danielgafni", email = "danielgafni16@gmail.com" },
+  { name = "geoheil", email = "georg.kf.heiler@gmail.com" },
+]
+license = { text = "Apache-2.0" }
+keywords = ["sql", "rdbms", "feray"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Distributed Computing",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.12"
+dependencies = ["feray", "sqlmodel>=0.0.24"]
+
+[tool.uv.sources]
+feray = { workspace = true }
+
+[tool.uv.build-backend]
+module-root = ""
+
+[build-system]
+requires = ["uv_build>=0.8.11,<1"]
+build-backend = "uv_build"
+
+[project.urls]
+Homepage = "https://github.com/feray-org/"
+Repository = "https://github.com/feray-org"
+Documentation = "https://github.com/feray-org/docs/dagster"
+"Bug Reports" = "https://github.com/feray-org/issues"

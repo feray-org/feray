@@ -37,6 +37,7 @@ ci-basics = { features = [
 dev = { features = [
   "dagster-basics",
   "dagster-webserver",
+  "controlplane-workload",
   "ray-workload",
   "ray-submission",
   "ci-basics",
@@ -70,6 +71,11 @@ dagster-docker = ">=0.27.0,<0.28"
 
 [tool.pixi.feature.dagster-webserver.pypi-dependencies]
 dagster-webserver = ">=1.11.0,<1.12"
+
+[tool.pixi.feature.controlplane-workload.dependencies]
+[tool.pixi.feature.controlplane-workload.pypi-dependencies]
+feray_polars = { path = "../projects/feray-polars", editable = true }
+feray_sql = { path = "../projects/feray-sql", editable = true }
 
 
 [tool.pixi.feature.ray-workload.dependencies]

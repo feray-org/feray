@@ -20,12 +20,7 @@ classifiers = [
   "Topic :: System :: Distributed Computing",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [
-  "ibis>=3.3.0",
-  "polars>=1.31.0",
-  "polars-hash>=0.5.4",
-  "sqlmodel>=0.0.24",
-]
+dependencies = ["ibis>=3.3.0", "loguru>=0.7.3"]
 
 [project.optional-dependencies]
 ray = ["ray>=2.48.0"]
@@ -34,7 +29,7 @@ ray = ["ray>=2.48.0"]
 module-root = ""
 
 [build-system]
-requires = ["uv_build>=0.8.8,<0.9"]
+requires = ["uv_build>=0.8.11,<1"]
 build-backend = "uv_build"
 
 [project.urls]
